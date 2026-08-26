@@ -7,9 +7,14 @@
 That was the brief. This repo is the answer, and the most useful thing in it is the finding
 that **you probably shouldn't build the expensive one.**
 
-![Concept render of the tier 3 waterer](docs/render.jpg)
+![Annotated concept render of the tier 3 waterer](docs/render-flow.jpg)
 
-<sup>**Concept render, not a built machine** — nothing here has been fabricated. Faithful to the spec where it counts: gravity reservoir over a stainless trough, hard-piped copper recirculation, cartridge filter and inline UV in the return leg, all of it on a drip tray over a drain.</sup>
+<sup>**Concept render, not a built machine** — nothing here has been fabricated. Faithful to the spec where it counts: gravity makeup through a 0 psi float valve, hard-piped copper recirculation, strainer ahead of the pump, blowdown at the low point, all on a drip tray over a drain. Three things to correct if you build from it: the cartridge filter is on the *suction* side (put it on the discharge — suction-side ΔP rises as the element loads, and that's how you cavitate a pump), the makeup fitting is yellow brass where the spec calls for lead-free NSF-61 or stainless, and an AC mag-drive pump can't be PWM-throttled — you need variable speed to get both a quiet 2 L/min serve and a 10 L/min scouring CIP.</sup>
+
+| | |
+|---|---|
+| [![P&ID](docs/pid.jpg)](docs/pid.jpg) | [![Exploded assembly](docs/exploded.jpg)](docs/exploded.jpg) |
+| Pictorial P&ID. Note two draughting errors: ST-301 is drawn downstream of P-101 (the strainer belongs upstream, protecting the impeller), and the return leg never closes back to the spout. Order of record: **bowl → ST-301 → P-101 → F-301 → UV-401 → riser → spout → bowl.** | Exploded assembly. Rough build order is bottom-up: frame, drip tray and bowl, then hang the loop — solder every copper joint on the bench before anything is mounted. |
 
 📄 **[Read the full illustrated spec →](docs/spec.html)** — P&ID, sizing tables, the numbers.
 Open it in a browser; it's a single self-contained file.
