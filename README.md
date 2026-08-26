@@ -7,6 +7,10 @@
 That was the brief. This repo is the answer, and the most useful thing in it is the finding
 that **you probably shouldn't build the expensive one.**
 
+![Concept render of the tier 3 waterer](docs/render.jpg)
+
+<sup>**Concept render, not a built machine** — nothing here has been fabricated. Faithful to the spec where it counts: gravity reservoir over a stainless trough, hard-piped copper recirculation, cartridge filter and inline UV in the return leg, all of it on a drip tray over a drain.</sup>
+
 📄 **[Read the full illustrated spec →](docs/spec.html)** — P&ID, sizing tables, the numbers.
 Open it in a browser; it's a single self-contained file.
 
