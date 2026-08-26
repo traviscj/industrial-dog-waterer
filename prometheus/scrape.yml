@@ -1,0 +1,11 @@
+# Fragment for prometheus.yml
+scrape_configs:
+  - job_name: dogfountain
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics          # ESPHome `prometheus:` component
+    static_configs:
+      - targets: ['dogfountain.home.arpa:80']
+        labels:
+          location: kitchen
+          vlan: "iot"

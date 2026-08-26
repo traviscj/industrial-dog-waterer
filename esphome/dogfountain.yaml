@@ -1,0 +1,343 @@
+# ------------------------------------------------------------------------------
+# dogfountain — ESPHome config
+#
+# Covers Tier 2 (load cell + stack light only) and Tier 3 (full recirc loop).
+# Set TIER below. Tier 2 ignores every actuator block.
+#
+# UNTESTED against hardware. Component syntax drifts between ESPHome releases —
+# in particular `one_wire`/`dallas_temp` replaced `dallas:` in 2025.x. Validate
+# with `esphome config dogfountain.yaml` before flashing.
+#
+# Network: IoT the IoT VLAN, SSID iot.
+# ------------------------------------------------------------------------------
+
+substitutions:
+  name: dogfountain
+  tier: "3"                    # "2" = telemetry only, "3" = full loop
+  reservoir_full_l: "57"       # 15 gal
+  reservoir_warn_frac: "0.30"  # amber slow
+  reservoir_crit_frac: "0.10"  # amber fast
+  bowl_volume_l: "2.0"
+  makeup_timeout_s: "90"       # hard stop on fill; flood protection layer 1 of 3
+  blowdown_open_s: "45"        # time to gravity-drain the bowl
+  pump_normal_duty: "0.35"     # ~2 L/min  — quiet
+  pump_cip_duty: "1.0"         # ~10 L/min — 1.1 m/s, Re~15000, scouring velocity
+  tds_cycles_limit: "1.5"      # blowdown when bowl_tds > 1.5 x makeup baseline
+
+esphome:
+  name: ${name}
+  on_boot:
+    priority: 800              # run before anything else can energise an actuator
+    then:
+      - switch.turn_off: makeup_valve
+      - switch.turn_off: uv_lamp
+      - script.execute: {id: pump_set, duty: 0.0}
+      - lambda: 'id(fault_latched) = false;'
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework: {type: esp-idf}
+
+logger:
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret iot_ssid        # iot
+  password: !secret iot_password
+  domain: .home.arpa
+  ap: {ssid: "${name}-fallback"}
+
+web_server:
+  port: 80
+prometheus:                     # -> http://dogfountain.home.arpa/metrics
+
+globals:
+  - {id: pump_cmd,        type: float, restore_value: no, initial_value: '0'}
+  - {id: fault_latched,   type: bool,  restore_value: no, initial_value: 'false'}
+  - {id: service_mode,    type: bool,  restore_value: no, initial_value: 'false'}
+  - {id: makeup_baseline_tds, type: float, restore_value: yes, initial_value: '170.0'}
+  - {id: uv_lamp_hours,   type: float, restore_value: yes, initial_value: '0'}
+  - {id: drink_liters_total, type: float, restore_value: yes, initial_value: '0'}
+
+# ------------------------------------------------------------------------------ sensors
+i2c:
+  sda: GPIO13
+  scl: GPIO14
+
+one_wire:
+  - platform: gpio
+    pin: GPIO6
+
+sensor:
+  # --- reservoir mass -> liters. No wetted parts; immune to foam/condensation.
+  - platform: hx711
+    name: "reservoir raw"
+    id: reservoir_raw
+    dout_pin: GPIO4
+    clk_pin: GPIO5
+    gain: 128
+    update_interval: 5s
+    internal: true
+    filters:
+      - median: {window_size: 9, send_every: 3}
+
+  - platform: template
+    name: "reservoir liters"
+    id: reservoir_liters
+    unit_of_measurement: L
+    accuracy_decimals: 2
+    update_interval: 15s
+    lambda: |-
+      // CALIBRATE: scale = counts per kg, tare = counts at empty.
+      const float scale = 21500.0f, tare = 128400.0f;
+      float kg = (id(reservoir_raw).state - tare) / scale;
+      // density correction, ~0.02%/K around 20C. Small, but free.
+      float t = id(water_temp).has_state() ? id(water_temp).state : 20.0f;
+      float rho = 1.0f - 0.00021f * (t - 20.0f);
+      return kg > 0 ? kg / rho : 0.0f;
+
+  - platform: template
+    name: "reservoir percent"
+    id: reservoir_pct
+    unit_of_measurement: "%"
+    update_interval: 15s
+    lambda: 'return 100.0f * id(reservoir_liters).state / ${reservoir_full_l};'
+
+  - platform: dallas_temp
+    name: "water temp"
+    id: water_temp
+    # address: 0x...   # fill in from the boot log
+    update_interval: 30s
+
+  - platform: pulse_counter
+    name: "makeup flow"
+    id: makeup_flow
+    pin: {number: GPIO7, mode: {input: true, pullup: true}}
+    unit_of_measurement: "L/min"
+    filters:
+      - lambda: 'return x / 450.0;'    # YF-S201: 450 pulses/L. CALIBRATE.
+    total:
+      name: "makeup liters total"
+      id: makeup_total
+      unit_of_measurement: L
+      filters:
+        - lambda: 'return x / 450.0;'
+
+  - platform: adc
+    name: "bowl tds"
+    id: bowl_tds
+    pin: GPIO8
+    attenuation: 12db
+    update_interval: 60s
+    unit_of_measurement: ppm
+    filters:
+      - median: {window_size: 7, send_every: 7}
+      # CALIBRATE against a known solution; probe-specific polynomial.
+      - lambda: 'return (133.42f*x*x*x - 255.86f*x*x + 857.39f*x) * 0.5f;'
+
+  - platform: ina219
+    address: 0x40
+    current: {name: "pump current", id: pump_current}
+    shunt_resistance: 0.1 ohm
+    max_voltage: 16.0V
+    max_current: 3.2A
+    update_interval: 10s
+
+  - platform: ina219
+    address: 0x41
+    current: {name: "uv current", id: uv_current}
+    shunt_resistance: 0.1 ohm
+    max_voltage: 16.0V
+    max_current: 3.2A
+    update_interval: 30s
+
+  - platform: template
+    name: "uv lamp hours"
+    id: uv_hours
+    unit_of_measurement: h
+    update_interval: 300s
+    lambda: 'return id(uv_lamp_hours);'
+
+  # Household intake: reservoir delta, minus blowdown, minus modelled evaporation.
+  # Aggregate across all dogs -- tells you *someone* changed, not who. See DESIGN.md 7.4.
+  - platform: template
+    name: "drink liters total"
+    id: drink_total
+    unit_of_measurement: L
+    update_interval: 60s
+    lambda: 'return id(drink_liters_total);'
+
+binary_sensor:
+  - platform: gpio
+    name: "bowl level low"
+    id: bowl_low
+    pin: {number: GPIO9, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 3s]
+    on_release:                      # went dry -- dogs have no water. Loudest alarm we have.
+      then:
+        - script.execute: {id: pump_set, duty: 0.0}   # dry-run interlock
+        - lambda: 'ESP_LOGE("dogfountain", "BOWL DRY");'
+
+  - platform: gpio
+    name: "bowl level high"
+    id: bowl_high
+    pin: {number: GPIO10, mode: {input: true, pullup: true}, inverted: true}
+    filters: [delayed_on_off: 3s]
+    on_press:
+      then: [switch.turn_off: makeup_valve]
+
+  - platform: gpio
+    name: "leak detected"
+    id: leak
+    pin: {number: GPIO11, mode: {input: true, pullup: true}, inverted: true}
+    on_press:                        # latching. Requires manual reset.
+      then:
+        - switch.turn_off: makeup_valve
+        - script.execute: {id: pump_set, duty: 0.0}
+        - switch.turn_off: uv_lamp
+        - lambda: 'id(fault_latched) = true;'
+
+  - platform: gpio
+    name: "service button"
+    pin: {number: GPIO12, mode: {input: true, pullup: true}, inverted: true}
+    on_click:
+      - min_length: 50ms
+        max_length: 900ms
+        then: [lambda: 'id(fault_latched) = false;']       # short press: clear fault
+      - min_length: 3s
+        max_length: 10s
+        then: [script.execute: enter_service_mode]         # long press: service mode
+
+# ------------------------------------------------------------------------------ actuators
+output:
+  - platform: ledc
+    id: pump_pwm
+    pin: GPIO15
+    frequency: 20000Hz      # above audible; dogs hear to ~45 kHz but PWM whine here is inaudible to us and low-amplitude
+  - {platform: gpio, id: light_green,  pin: GPIO21}
+  - {platform: gpio, id: light_amber,  pin: GPIO35}
+  - {platform: gpio, id: light_red,    pin: GPIO36}
+
+switch:
+  - platform: gpio
+    name: "uv lamp"
+    id: uv_lamp
+    pin: GPIO16
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    name: "makeup valve"     # NC solenoid: de-energised = closed
+    id: makeup_valve
+    pin: GPIO17
+    restore_mode: ALWAYS_OFF
+    interlock: [blowdown_valve]
+    on_turn_on:
+      then:                   # flood protection layer 1: hard time limit on any fill
+        - delay: ${makeup_timeout_s}s
+        - if:
+            condition: {switch.is_on: makeup_valve}
+            then:
+              - switch.turn_off: makeup_valve
+              - lambda: |-
+                  id(fault_latched) = true;
+                  ESP_LOGE("dogfountain", "makeup timeout -- valve or level switch fault");
+  - platform: gpio
+    name: "blowdown valve"    # motorized ball valve: holds position on power loss
+    id: blowdown_valve
+    pin: GPIO18
+    restore_mode: ALWAYS_OFF
+    interlock: [makeup_valve]
+
+# ------------------------------------------------------------------------------ control
+script:
+  - id: pump_set
+    mode: restart
+    parameters: {duty: float}
+    then:
+      - output.set_level:
+          id: pump_pwm
+          level: !lambda 'return duty;'
+      - lambda: 'id(pump_cmd) = duty;'
+
+  - id: enter_service_mode
+    then:
+      - lambda: 'id(service_mode) = true;'
+      - switch.turn_off: makeup_valve
+      - switch.turn_off: uv_lamp
+      - script.execute: {id: pump_set, duty: 0.0}
+
+  # Daily dump + refill. The 24h floor is NOT optional: conductivity is a poor
+  # proxy for saliva/organic load, so it can only ever *add* dumps. See DESIGN.md 5.1.
+  - id: blowdown_cycle
+    mode: single
+    then:
+      - script.execute: {id: pump_set, duty: 0.0}
+      - switch.turn_on: blowdown_valve
+      - delay: ${blowdown_open_s}s
+      - switch.turn_off: blowdown_valve
+      - switch.turn_on: makeup_valve        # refills until bowl_high, or times out
+      - wait_until:
+          condition: {binary_sensor.is_on: bowl_high}
+          timeout: ${makeup_timeout_s}s
+      - switch.turn_off: makeup_valve
+      - script.execute:
+          id: pump_set
+          duty: ${pump_normal_duty}
+
+  # 100% duty -> ~1.1 m/s -> Re ~15,000. Turbulent shear is what removes biofilm;
+  # a slow rinse does not. This is why the pump is oversized.
+  - id: cip_recirculate
+    then:
+      - script.execute:
+          id: pump_set
+          duty: ${pump_cip_duty}
+      - delay: 15min
+      - script.execute: {id: pump_set, duty: 0.0}
+
+interval:
+  - interval: 24h
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(service_mode) && !id(fault_latched);'
+          then: [script.execute: blowdown_cycle]
+
+  - interval: 30min          # adaptive extra blowdown when actually concentrating
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return !id(service_mode) && !id(fault_latched)
+                     && id(bowl_tds).state > ${tds_cycles_limit} * id(makeup_baseline_tds);
+          then: [script.execute: blowdown_cycle]
+
+  - interval: 60s
+    then:
+      - lambda: |-
+          if (id(uv_lamp).state && id(uv_current).state > 0.05f) id(uv_lamp_hours) += 1.0f/60.0f;
+
+  # ---- stack light. Cloud-free by construction: nothing below touches the network.
+  - interval: 500ms
+    then:
+      - lambda: |-
+          static bool blink = false; blink = !blink;
+          static uint8_t tick = 0; tick++;
+          bool slow = (tick / 4) % 2;          // 0.5 Hz
+          bool fast = blink;                   // 2 Hz
+
+          bool dry   = !id(bowl_low).state;
+          bool leakf = id(leak).state;
+          bool pump_stalled = id(pump_cmd) > 0.1f && id(pump_current).state < 0.05f;
+          bool fault = id(fault_latched) || dry || leakf || pump_stalled;
+
+          float pct = id(reservoir_pct).has_state() ? id(reservoir_pct).state : 100.0f;
+          bool crit = pct < ${reservoir_crit_frac} * 100.0f;
+          bool warn = pct < ${reservoir_warn_frac} * 100.0f;
+          bool uv_bad = id(uv_lamp_hours) > 8000.0f
+                     || (id(uv_lamp).state && id(uv_current).state < 0.05f);
+
+          id(light_red).set_state(fault && fast);
+          id(light_amber).set_state(!fault && ((crit || uv_bad) ? fast : (warn ? slow : false))
+                                     || id(service_mode));
+          id(light_green).set_state(!fault && !warn && !uv_bad && !id(service_mode));

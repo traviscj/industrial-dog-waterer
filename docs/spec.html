@@ -1,0 +1,565 @@
+<title>Copper Loop Waterer</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#E9EDEE; --card:#FDFDFC; --ink:#12191C; --ink-2:#3D4A50; --ink-3:#6B7A81;
+  --line:#C3CDD0; --line-2:#DCE3E4;
+  --copper:#A95F2E; --copper-soft:#EBD9CB;
+  --verdigris:#2F7F6C; --amber:#A8790E; --red:#B23A2E;
+  --grid:#D3DBDD;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1316; --card:#141C20; --ink:#DFE7E9; --ink-2:#A2B0B5; --ink-3:#71828A;
+    --line:#2A363B; --line-2:#1E282C;
+    --copper:#D08A50; --copper-soft:#3A2517;
+    --verdigris:#4FBBA0; --amber:#D7A72E; --red:#E0685A;
+    --grid:#1F2A2E;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1316; --card:#141C20; --ink:#DFE7E9; --ink-2:#A2B0B5; --ink-3:#71828A;
+  --line:#2A363B; --line-2:#1E282C;
+  --copper:#D08A50; --copper-soft:#3A2517;
+  --verdigris:#4FBBA0; --amber:#D7A72E; --red:#E0685A;
+  --grid:#1F2A2E;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 20px 80px}
+mark{background:var(--copper-soft); color:var(--ink); padding:0 .2em}
+
+/* ---- nameplate ---- */
+.plate{border-bottom:2px solid var(--ink); padding:26px 0 14px; margin-bottom:28px}
+.plate-top{display:flex; flex-wrap:wrap; gap:12px 28px; align-items:baseline; justify-content:space-between}
+h1{
+  font-family:"Barlow Condensed",Impact,sans-serif; font-weight:600; font-size:clamp(38px,7vw,64px);
+  line-height:.95; letter-spacing:.005em; margin:0; text-transform:uppercase; text-wrap:balance;
+}
+h1 em{font-style:normal; color:var(--copper)}
+.stamp{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ink-3); text-align:right; line-height:1.7; font-variant-numeric:tabular-nums;
+}
+.dek{margin:14px 0 0; max-width:64ch; color:var(--ink-2); font-size:16px}
+
+/* ---- section scaffolding: gutter carries the P&ID tag, which is real reference data ---- */
+section{
+  display:grid; grid-template-columns:112px minmax(0,1fr); gap:0 22px;
+  border-top:1px solid var(--line); padding:26px 0 6px;
+}
+.tag{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-3); padding-top:5px; font-variant-numeric:tabular-nums;
+}
+.tag b{display:block; color:var(--copper); font-weight:600}
+h2{
+  font-family:"Barlow Condensed",sans-serif; font-weight:600; text-transform:uppercase;
+  font-size:26px; letter-spacing:.02em; margin:0 0 10px; line-height:1.1;
+}
+h3{font-family:"Barlow Condensed",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:15px;margin:22px 0 6px;color:var(--ink-2)}
+section > div > p{margin:0 0 11px; max-width:68ch}
+section > div > p:last-child{margin-bottom:14px}
+ul{margin:0 0 12px; padding-left:18px; max-width:68ch}
+li{margin-bottom:5px}
+@media (max-width:720px){
+  section{grid-template-columns:1fr; gap:4px}
+  .tag{padding-top:0}
+  .tag b{display:inline; margin-right:8px}
+}
+
+/* ---- tables ---- */
+.scroll{overflow-x:auto; margin:0 0 16px; border:1px solid var(--line); background:var(--card)}
+table{border-collapse:collapse; width:100%; font-size:13px}
+th,td{padding:6px 10px; text-align:left; border-bottom:1px solid var(--line-2); vertical-align:top}
+thead th{
+  font-family:"Barlow Condensed",sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+  font-size:12px; color:var(--ink-2); background:var(--paper); border-bottom:1px solid var(--line); white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+.num,td.n,th.n{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+tr.hi td{background:var(--copper-soft)}
+tr.total td{border-top:1px solid var(--ink); font-weight:600}
+code,kbd{font-family:"IBM Plex Mono",monospace; font-size:.88em; background:var(--line-2); padding:1px 4px}
+pre{
+  font-family:"IBM Plex Mono",monospace; font-size:12.5px; line-height:1.6; background:var(--card);
+  border:1px solid var(--line); border-left:3px solid var(--copper); padding:12px 14px; overflow-x:auto; margin:0 0 16px;
+}
+pre b{color:var(--copper); font-weight:600}
+
+/* ---- callout ---- */
+.note{
+  border:1px solid var(--line); border-left:3px solid var(--verdigris); background:var(--card);
+  padding:12px 14px; margin:0 0 16px; font-size:14px;
+}
+.note.warn{border-left-color:var(--amber)}
+.note.stop{border-left-color:var(--red)}
+.note h4{
+  font-family:"Barlow Condensed",sans-serif; text-transform:uppercase; letter-spacing:.06em;
+  font-size:13px; margin:0 0 4px; color:var(--ink-2)
+}
+.note p{margin:0 0 8px; max-width:66ch}
+.note p:last-child{margin:0}
+
+/* ---- lamp chips: same three colors as the physical stack light ---- */
+.lamp{display:inline-flex; align-items:center; gap:6px; font-family:"IBM Plex Mono",monospace; font-size:11.5px; white-space:nowrap}
+.lamp i{width:11px; height:11px; border-radius:50%; display:inline-block; flex:none}
+.g i{background:var(--verdigris)} .a i{background:var(--amber)} .r i{background:var(--red)}
+.blink i{animation:bl 1s steps(1,end) infinite}
+.blink.fast i{animation-duration:.5s}
+@keyframes bl{50%{opacity:.18}}
+@media (prefers-reduced-motion:reduce){.blink i{animation:none;opacity:.65}}
+
+/* ---- diagram ---- */
+figure{margin:0 0 16px}
+.pid{border:1px solid var(--line); background:var(--card); overflow-x:auto}
+.pid svg{display:block; min-width:760px; width:100%; height:auto}
+figcaption{font-size:12px; color:var(--ink-3); margin-top:6px; font-family:"IBM Plex Mono",monospace}
+.legend{display:flex; flex-wrap:wrap; gap:6px 20px; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-2); margin-top:8px}
+.legend span{display:inline-flex; align-items:center; gap:7px}
+.legend s{width:24px; height:0; border-top:2px solid var(--ink-2); text-decoration:none; display:inline-block}
+.legend s.cu{border-color:var(--copper)}
+.legend s.dr{border-top-style:dashed}
+
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); margin:0 0 18px}
+.kpi{background:var(--card); padding:9px 11px}
+.kpi dt{font-family:"Barlow Condensed",sans-serif; text-transform:uppercase; letter-spacing:.06em; font-size:11.5px; color:var(--ink-3); margin:0}
+.kpi dd{margin:1px 0 0; font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.2}
+.kpi dd small{font-size:11px; font-weight:400; color:var(--ink-3)}
+footer{border-top:2px solid var(--ink); margin-top:34px; padding-top:12px; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3)}
+a{color:var(--copper)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--copper); outline-offset:2px}
+</style>
+
+<div class="wrap">
+
+<header class="plate">
+  <div class="plate-top">
+    <h1>Copper&nbsp;Loop<br><em>Dog&nbsp;Waterer</em></h1>
+    <div class="stamp">
+      Spec rev B &nbsp;&#183;&nbsp; 2026-08-26<br>
+      Replaces: Kastty FS55, 7.6 L, ABS<br>
+      Service: 2 dogs, potable, seasonal outdoor
+    </div>
+  </div>
+  <p class="dek">Four requirements &#8212; copper, cleanable, bigger, fewer filters &#8212; plus a surplus tank that emails you before it runs dry. Below: the honest cheap answer first, then the full recirculating build, because the second one is only worth it for two things the first can't do.</p>
+</header>
+
+<section>
+  <div class="tag"><b>&#167;00</b>Scope</div>
+  <div>
+    <h2>Pick a tier and stop there</h2>
+    <p>Each row is a complete, buildable system. They are ordered by cost, and the value does not increase linearly &#8212; Tier 2 is where the curve bends.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Tier</th><th>System</th><th class="n">Cost</th><th>Consumables</th><th class="n">Refill</th><th>How it tells you</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0</td><td>Kastty FS55 (what you own)</td><td class="n">$40</td><td>carbon pads, monthly</td><td class="n">~2 d</td><td>blue &#8594; red LED</td></tr>
+        <tr><td class="num">1</td><td>Livestock gravity waterer + drain</td><td class="n">$70</td><td><strong>none</strong></td><td class="n">~4 d</td><td>you look at it</td></tr>
+        <tr class="hi"><td class="num">2</td><td><strong>Tier 1 + load cells + stack light</strong> &#8592; build this</td><td class="n">$130</td><td><strong>none</strong></td><td class="n">~4 d</td><td>blinking light, no cloud</td></tr>
+        <tr><td class="num">3</td><td>Copper recirc loop, UV, blowdown, 57 L</td><td class="n">$1,060</td><td>UV lamp + gaskets, yearly</td><td class="n">~12 d</td><td>Prometheus &#8594; email</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note">
+      <h4>On the gravity waterer you linked</h4>
+      <p>You're right, and it deserves to be said plainly: <strong>that plus a drain solves most of the brief for about $70.</strong> It wins on tank size, refillability, and filter changes by <em>deleting components</em> &#8212; there is no pump to disassemble and no filter to replace, ever. Tap the trough at its low point with a bulkhead and a full-port ball valve, run a hose to a floor drain or utility sink, and weekly maintenance becomes: open valve, rinse, close valve.</p>
+      <p>What it genuinely cannot do: move the water, and disinfect it. That is the entire case for Tier 3.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;01</b>Tier 1<br>Automation</div>
+  <div>
+    <h2>Flush-on-fill: what "self-cleaning" actually means</h2>
+    <p>The livestock waterer has no pump, no filter, and no electronics. Turning the water on does two things: a jet scours the bottom, and the rising level pushes the surface film &#8212; hair, pollen, slobber, mosquito larvae &#8212; over an overflow and out. There is no cleaning cycle to trigger. There is only <em>flowing</em> and <em>not flowing</em>.</p>
+    <p>So the entire automation problem is <mark>turn the hose on for one minute, N times a day</mark>. A hose timer really is the whole solution. A built-in check valve keeps the hose clean and lets you disconnect and use it as an ordinary pail &#8212; which matters more than it sounds, see freezing below.</p>
+
+    <h3>What owners actually run</h3>
+    <div class="scroll"><table>
+      <thead><tr><th class="n">Schedule</th><th class="n">Water/day</th><th>Reported result</th></tr></thead>
+      <tbody>
+        <tr><td class="n">1 min &#215; 12/day</td><td class="n">12 min</td><td>"fresh and cool" &#8212; still does a manual dump every other day</td></tr>
+        <tr class="hi"><td class="n">1 min &#215; 6/day</td><td class="n">6 min</td><td>3 large dogs, hot climate &#8212; "I don't worry they'll be out of water"</td></tr>
+        <tr><td class="n">2 min &#215; 3/day</td><td class="n">6 min</td><td>"water stays clean and cool"</td></tr>
+        <tr><td class="n">1 min &#215; 2/day</td><td class="n">2 min</td><td>"cleans itself very very well"</td></tr>
+        <tr><td class="n">3 min &#215; 3/day</td><td class="n">9 min</td><td><strong>still got algae</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p>Two things fall out of that. <strong>One-minute runs are the norm</strong>, so minimum run time is the spec that decides which timer you can buy. And the owner running the <em>most</em> water got the algae while the one running the most <em>often</em> didn't &#8212; duration isn't the variable, <strong>light is</strong>.</p>
+
+    <h3>Buy on three specs, not on brand</h3>
+    <ul>
+      <li><strong>Minimum run time &#8804; 1 minute.</strong> Non-negotiable. Some timers floor at 5 minutes, which quintuples the water for no benefit.</li>
+      <li><strong>Interval scheduling &#8212; "every N hours" &#8212; not "N start times per day."</strong> This is the one that quietly bites: several popular smart timers cap around 4 start times per program, so you're stuck at 4 flushes/day unless you stack programs. A dumb interval dial does every-2-hours natively.</li>
+      <li><strong>Working pressure covers your bib.</strong> Typical range is 10&#8211;100 psi, some newer units down to 5. Municipal supply is fine; <strong>a rain barrel is not</strong> &#8212; these are diaphragm valves and need line pressure to seat.</li>
+    </ul>
+    <div class="scroll"><table>
+      <thead><tr><th>Option</th><th>What</th><th class="n">Cost</th><th>Why / why not</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td class="num">A</td><td>Mechanical or digital <strong>interval dial</strong> &#8212; set duration, set "every N hours"</td><td class="n">$30&#8211;40</td><td>Does exactly the one job. No app, no account, no firmware. <strong>Start here.</strong></td></tr>
+        <tr><td class="num">B</td><td>Smart Wi-Fi/Bluetooth timer</td><td class="n">$50&#8211;100</td><td>Remote schedule changes and a run log. Check the start-times cap first. Piston-valve models pass more flow than ball-valve ones.</td></tr>
+        <tr><td class="num">C</td><td><strong>ESP32 + irrigation solenoid + flow sensor</strong></td><td class="n">~$35</td><td>The only option that can tell you the valve <em>actually opened</em>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Option C, because a hose timer fails silently</h3>
+    <p>The battery dies, the valve stops opening, and you find out when the bucket is empty. Twenty dollars of parts fixes that, and it drops straight into the firmware already in this build.</p>
+    <pre>hose bib &#9472;&#9472;[ vacuum breaker ]&#9472;&#9472;[ &#190;" <b>NC</b> irrigation solenoid ]&#9472;&#9472;[ flow sensor ]&#9472;&#9472; waterer
+                                        &#9650;                          &#9474;
+                               24 VAC via relay                    &#9474; pulses
+                                        &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; ESP32 &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</pre>
+    <ul>
+      <li><strong>Valve:</strong> any &#190;" jar-top irrigation solenoid, ~$12. Normally closed, so a power cut or a crashed controller leaves it shut. These sit in buried sprinkler boxes for a decade.</li>
+      <li><strong>Drive:</strong> 24 VAC transformer and a relay, if you have mains at the bib. For battery or solar, use a 12 V <strong>latching</strong> solenoid with an H-bridge &#8212; it draws current only during the ~50 ms pulse.</li>
+      <li><strong>The flow sensor is the point.</strong> Command open; if the pulse counter hasn't moved in 5 seconds, that's a fault &#8212; no supply, dead valve, kinked hose, closed bib. The failure becomes loud instead of silent. It also catches the expensive failure, a valve stuck <em>open</em>, as flow that never stops.</li>
+    </ul>
+
+    <div class="note stop">
+      <h4>Freezing &#8212; the gotcha every glowing review is silent about</h4>
+      <p>The people raving about this are watering dogs in the Sun Belt. A hose bib timer is a plastic body full of standing water, and manufacturers state plainly that <strong>freeze damage isn't covered under warranty</strong>. Outside a mild climate this is a <strong>seasonal system</strong>: run it spring through fall; at the first hard freeze shut the bib, drain the timer, store it indoors, and disconnect the hose &#8212; the check valve means the waterer keeps working as a plain pail, which is exactly what that feature is for.</p>
+      <p>Year-round automation in a cold climate is a different build: frost-free hydrant, supply line below frost depth, heated bowl. Real money and a trench. And if the dogs are outside in freezing weather you need a heated bowl regardless &#8212; flushing doesn't solve ice.</p>
+    </div>
+
+    <div class="note warn">
+      <h4>Backflow &#8212; the one part not to improvise</h4>
+      <p>The waterer's check valve is not a backflow preventer. A hose sitting in an animal watering vessel is a textbook cross-connection, and most plumbing codes already require a <strong>hose bib vacuum breaker</strong> on every outdoor spigot. It's $8 and threads on in ten seconds.</p>
+    </div>
+
+    <h3>Water use &#8212; measure once, then decide</h3>
+    <p>Nobody publishes the flow rate and it depends on your line pressure, so measure it: bucket under the overflow, run one minute, measure what comes out.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Flush flow</th><th class="n">1 min &#215; 2/day</th><th class="n">1 min &#215; 6/day</th><th class="n">1 min &#215; 12/day</th></tr></thead>
+      <tbody>
+        <tr><td>1.5 GPM</td><td class="n">90 gal/mo</td><td class="n">270 gal/mo</td><td class="n">540 gal/mo</td></tr>
+        <tr class="hi"><td>3.0 GPM</td><td class="n">180 gal/mo</td><td class="n">540 gal/mo</td><td class="n">1,080 gal/mo</td></tr>
+        <tr><td>5.0 GPM</td><td class="n">300 gal/mo</td><td class="n">900 gal/mo</td><td class="n">1,800 gal/mo</td></tr>
+      </tbody>
+    </table></div>
+    <p>Not free &#8212; and in many places <strong>sewer is billed off the water meter</strong>, so outdoor use gets charged twice unless your utility offers an irrigation deduct. <strong>Start at 1 min every 6 h</strong> and turn it up only if the water actually looks bad. Every-two-hours is a hot-afternoon setting, not a default.</p>
+    <p>Two placement rules that follow from those volumes: put the discharge where it waters something useful, and keep it <strong>at least 10 ft from the foundation</strong> &#8212; several hundred gallons a month against a basement wall over clay is a genuinely bad idea. And on algae: flushing controls film and debris, not algae, because algae is a light problem. Full shade first, opaque bucket second, schedule third.</p>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;02</b>P&amp;ID<br>Tier 3</div>
+  <div>
+    <h2>Two circuits, deliberately separate</h2>
+    <p><strong>Makeup</strong> is gravity-fed, intermittent, and carries municipal water <em>with its chlorine residual intact</em>. <strong>Recirculation</strong> is pumped, continuous, and only ever sees the two litres in the bowl. Keeping them apart means the pump can't drain the reservoir, the filter never processes 57 L it doesn't need to, and a fault in the loop can't put the tank on your floor.</p>
+    <figure>
+      <div class="pid">
+      <svg viewBox="0 0 960 520" role="img" aria-label="Process and instrumentation diagram: a 57 litre reservoir gravity-feeds a stainless bowl through a solenoid valve; the bowl recirculates through a strainer, pump, pleated filter and UV lamp, returning through a copper riser to a spout; an overflow standpipe and a motorised blowdown valve both discharge to drain.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-2)"/>
+          </marker>
+          <marker id="arc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--copper)"/>
+          </marker>
+        </defs>
+        <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-2)">
+
+        <!-- reservoir -->
+        <rect x="420" y="26" width="200" height="112" rx="8" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="420" y1="62" x2="620" y2="62" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="432" y="50" font-size="11" fill="var(--ink)" font-weight="600">TK-101</text>
+        <text x="432" y="84" >57 L SS reservoir</text>
+        <text x="432" y="98" >top fill &#183; 1.2 m head</text>
+        <text x="432" y="112" fill="var(--ink-3)">WT-101 mass &#8594; litres</text>
+        <!-- load cells -->
+        <path d="M436,138 l10,14 h-20 z M604,138 l10,14 h-20 z" fill="var(--ink-2)"/>
+        <line x1="404" y1="152" x2="636" y2="152" stroke="var(--ink-2)" stroke-width="2"/>
+
+        <!-- makeup line: reservoir -> bowl -->
+        <path d="M520,138 V182 M520,206 V300" fill="none" stroke="var(--ink-2)" stroke-width="2" marker-end="url(#ar)"/>
+        <!-- solenoid valve FV-201 -->
+        <path d="M508,182 l24,12 l-24,12 z M532,182 l-24,12 l24,12 z" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <rect x="510" y="168" width="20" height="12" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="542" y="192" font-weight="600" fill="var(--ink)">FV-201</text>
+        <text x="542" y="205" fill="var(--ink-3)">NC solenoid</text>
+
+        <!-- bowl -->
+        <path d="M300,300 H560 V368 H300 Z" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <line x1="300" y1="318" x2="560" y2="318" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="312" y="340" font-size="11" font-weight="600" fill="var(--ink)">TK-102</text>
+        <text x="312" y="356">316 SS bowl &#183; 2 L &#183; quick-release</text>
+
+        <!-- spout in -->
+        <path d="M360,120 V286" fill="none" stroke="var(--copper)" stroke-width="2.5" marker-end="url(#arc)"/>
+        <path d="M352,286 h16 l-4,8 h-8 z" fill="var(--copper)"/>
+
+        <!-- recirc suction -->
+        <path d="M330,368 V430 H150" fill="none" stroke="var(--copper)" stroke-width="2.5"/>
+        <!-- strainer -->
+        <rect x="256" y="418" width="26" height="24" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <path d="M256,442 l26,-24" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="240" y="464" fill="var(--ink)" font-weight="600">ST-301</text>
+        <!-- pump -->
+        <circle cx="196" cy="430" r="17" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <path d="M188,421 l16,9 l-16,9 z" fill="var(--ink)"/>
+        <text x="176" y="464" fill="var(--ink)" font-weight="600">P-101</text>
+        <text x="140" y="478" fill="var(--ink-3)">PWM 2 &#8594; 10 L/min</text>
+
+        <!-- riser with filter and UV -->
+        <path d="M150,430 V120 H352" fill="none" stroke="var(--copper)" stroke-width="2.5"/>
+        <rect x="128" y="300" width="44" height="82" rx="5" fill="var(--card)" stroke="var(--ink)" stroke-width="2"/>
+        <path d="M136,316 h28 M136,330 h28 M136,344 h28 M136,358 h28" stroke="var(--ink-2)" stroke-width="1.5"/>
+        <text x="182" y="332" fill="var(--ink)" font-weight="600">F-301</text>
+        <text x="182" y="345" fill="var(--ink-3)">20 &#181;m pleated</text>
+        <text x="182" y="358" fill="var(--ink-3)">washable</text>
+        <rect x="128" y="178" width="44" height="76" rx="5" fill="var(--card)" stroke="var(--ink)" stroke-width="2"/>
+        <path d="M138,196 q7,10 14,0 q7,-10 14,0 M138,216 q7,10 14,0 q7,-10 14,0 M138,236 q7,10 14,0 q7,-10 14,0" fill="none" stroke="var(--verdigris)" stroke-width="2"/>
+        <text x="182" y="210" fill="var(--ink)" font-weight="600">UV-401</text>
+        <text x="182" y="223" fill="var(--ink-3)">9&#8211;18 W UV-C</text>
+        <text x="182" y="236" fill="var(--ink-3)">lamp hours logged</text>
+        <text x="196" y="112" fill="var(--copper)">&#189;" type L copper</text>
+
+        <!-- overflow standpipe -->
+        <path d="M560,326 H700 V470" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="7 5"/>
+        <text x="574" y="318" fill="var(--ink-3)">overflow standpipe &#8212; the flood cannot happen</text>
+
+        <!-- blowdown -->
+        <path d="M500,368 V404 M500,428 V470 H860" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="7 5"/>
+        <path d="M488,404 l24,12 l-24,12 z M512,404 l-24,12 l24,12 z" fill="none" stroke="var(--ink)" stroke-width="2"/>
+        <circle cx="500" cy="396" r="7" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+        <text x="522" y="414" fill="var(--ink)" font-weight="600">FV-202</text>
+        <text x="522" y="427" fill="var(--ink-3)">motorised ball &#183; daily dump</text>
+        <path d="M700,470 H860" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="7 5" fill="none"/>
+        <path d="M860,462 v16 M852,478 h16 M856,486 h8" stroke="var(--ink-2)" stroke-width="2" fill="none"/>
+        <text x="836" y="504" fill="var(--ink)" font-weight="600">DRAIN</text>
+
+        <!-- instrument bubbles -->
+        <g stroke="var(--ink)" stroke-width="1.5" fill="var(--card)">
+          <circle cx="646" cy="94" r="15"/><circle cx="596" cy="288" r="15"/><circle cx="640" cy="352" r="15"/><circle cx="88" cy="430" r="15"/>
+        </g>
+        <g stroke="var(--ink-3)" stroke-width="1"><line x1="631" y1="94" x2="661" y2="94"/><line x1="581" y1="288" x2="611" y2="288"/><line x1="625" y1="352" x2="655" y2="352"/><line x1="73" y1="430" x2="103" y2="430"/></g>
+        <g font-size="9" fill="var(--ink)" text-anchor="middle" font-weight="600">
+          <text x="646" y="92">WT</text><text x="646" y="104">101</text>
+          <text x="596" y="286">LSL</text><text x="596" y="298">201</text>
+          <text x="640" y="350">AT</text><text x="640" y="352" dy="12">301</text>
+          <text x="88" y="428">II</text><text x="88" y="440">301</text>
+        </g>
+        <line x1="596" y1="303" x2="560" y2="330" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="625" y1="352" x2="560" y2="352" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="631" y1="94" x2="620" y2="94" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="3 3"/>
+        <line x1="103" y1="430" x2="179" y2="430" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="3 3"/>
+        </g>
+      </svg>
+      </div>
+      <div class="legend">
+        <span><s></s> makeup / gravity</span>
+        <span><s class="cu"></s> recirculation, copper</span>
+        <span><s class="dr"></s> to drain</span>
+        <span>&#9711;&#8212; field instrument</span>
+      </div>
+      <figcaption>Variant A shown (drain reachable). Variant B swaps the standpipe for a mechanical float valve, a drip tray, and a leak rope &#8212; see the build notes.</figcaption>
+    </figure>
+    <div class="note">
+      <h4>The one decision that changes the build</h4>
+      <p><strong>If you can reach a drain within ~15 ft</strong> &#8212; utility sink, washer standpipe, floor drain, condensate pump &#8212; use the overflow standpipe. Every valve's failure mode becomes "water goes down the pipe," which is what makes electronic level control safe to have in the first place. Blowdown becomes automatic and the whole system approaches zero maintenance.</p>
+      <p><strong>If you can't</strong>, the mechanical float valve is primary level control with the solenoid as an electronic backstop, blowdown goes to a 20 L jug sitting on its own load cell, and the jug alerts you when it's full.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;03</b>TK-101<br>Sizing</div>
+  <div>
+    <h2>How big the surplus tank has to be</h2>
+    <pre>drinking     50 mL/kg/day   normal band 40&#8211;70; sustained &gt;100 is a vet visit, see &#167;06
+evaporation  0.4&#8211;0.8 L/day  open bowl, falling aerated stream, indoor
+blowdown     1.0&#8211;1.5 L/day  the daily bowl dump, &#167;04</pre>
+    <div class="scroll"><table>
+      <thead><tr><th>Household</th><th class="n">Drinking</th><th class="n">Total/day</th><th class="n">19 L keg</th><th class="n">57 L tank</th></tr></thead>
+      <tbody>
+        <tr><td>2 &#215; 20 kg</td><td class="n">2.0 L</td><td class="n">3.7 L</td><td class="n">5.1 d</td><td class="n">15.4 d</td></tr>
+        <tr class="hi"><td>2 &#215; 30 kg</td><td class="n">3.0 L</td><td class="n">4.7 L</td><td class="n">4.0 d</td><td class="n">12.1 d</td></tr>
+        <tr><td>2 &#215; 40 kg</td><td class="n">4.0 L</td><td class="n">5.7 L</td><td class="n">3.3 d</td><td class="n">10.0 d</td></tr>
+        <tr><td>3 &#215; 30 kg</td><td class="n">4.5 L</td><td class="n">6.2 L</td><td class="n">3.1 d</td><td class="n">9.2 d</td></tr>
+      </tbody>
+    </table></div>
+    <p><mark>57 L (15 gal) is the sweet spot.</mark> It moves refilling from a chore to a "whenever, roughly biweekly." A 19 L corny keg only buys 2&#215; over the Kastty, which is not enough to change your behaviour. Use a 15 gal Sanke keg or a stainless brew kettle &#8212; stainless doesn't harbour biofilm the way scratched HDPE does.</p>
+    <p>Mount it 1.0&#8211;1.3 m above the bowl rim: 1.4&#8211;1.9 psi of static head. <strong>Buy a float valve rated from 0 psi</strong> (Kerick, Hudson, Jobe livestock). Fluidmaster-style toilet valves need ~10 psi to seal and will weep forever on gravity. This catches people.</p>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;04</b>F-301<br>Filtration</div>
+  <div>
+    <h2>Delete the carbon &#8212; it's the problem, not the solution</h2>
+    <p>The FS55's "5-stage" is a hair bag, PP cotton, a coconut-shell carbon pad, more PP, and a sponge. In a closed recirculating loop that stack is close to actively harmful:</p>
+    <ul>
+      <li>Activated carbon is <strong>exhausted within days</strong> for anything it actually adsorbs, and there is nothing left to adsorb in a loop you already dechlorinated.</li>
+      <li>It then becomes a <strong>bacterial substrate</strong> &#8212; warm, dark, enormous specific surface area, saliva for feedstock, zero disinfectant residual. That is a bioreactor with a pet-safe label, and it is the real reason those pads "need" monthly replacement. Colonisation, not exhaustion.</li>
+      <li>It <strong>strips the chlorine</strong> that was the only thing keeping the water microbiologically stable.</li>
+    </ul>
+    <p>Replace the whole stack with three things that don't wear out:</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Stage</th><th>Part</th><th>Catches</th><th>Service</th></tr></thead>
+      <tbody>
+        <tr><td class="num">ST-301</td><td>304 SS strainer basket, 800 &#181;m</td><td>hair, kibble, leaves</td><td>rinse weekly, lasts forever</td></tr>
+        <tr><td class="num">F-301</td><td>10" Big Blue washable pleated, 20 &#181;m</td><td>fines, turbidity</td><td>hose off quarterly, ~3 yr life</td></tr>
+        <tr><td class="num">UV-401</td><td>inline UV-C, 9&#8211;18 W</td><td>the actual microbiology</td><td><strong>lamp yearly</strong>, sleeve wiped quarterly</td></tr>
+      </tbody>
+    </table></div>
+    <p><mark>One scheduled consumable per year</mark> &#8212; a $25 UV lamp &#8212; against twelve carbon pads. On dose: an 8 L loop at 2 L/min turns over 360&#215;/day, so cumulative UV dose is enormous even from a cheap unit. <strong>You are maintenance-limited, not dose-limited.</strong> UV fails from a fouled quartz sleeve far more often than from lamp age, which is why the sleeve wipe is in the procedure and why the lamp is instrumented rather than trusted.</p>
+    <h3>Deliberately excluded</h3>
+    <ul>
+      <li><strong>RO</strong> &#8212; wastes 3:1, strips minerals, and produces aggressive low-TDS water that attacks copper.</li>
+      <li><strong>Ozone</strong> &#8212; corrodes copper hard, and residual management is a project of its own.</li>
+      <li><strong>Silver / ion cartridges</strong> &#8212; unregulated, unmeasurable, and you already have copper doing this.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;05</b>FV-202<br>Cleaning</div>
+  <div>
+    <h2>Blowdown is the "better cleaning" answer</h2>
+    <p>A consumer fountain recirculates the same two litres of saliva-water for a week. That is the whole problem, and no filter fixes it. The industrial answer is the cooling-tower answer: <strong>bleed continuously and replace.</strong> Evaporation removes pure water and concentrates everything else, so hold cycles of concentration <code>C = TDS_bowl / TDS_makeup</code> with a bleed rate <code>B = E / (C &#8722; 1)</code>:</p>
+    <pre>E = 0.5 L/day        evaporation
+C = 1.5              target cycles (towers run 3&#8211;7; this is deliberately conservative)
+<b>B = 0.5 / 0.5 = 1.0 L/day</b>   bowl TDS never exceeds 1.5&#215; tap, forever, with no filter involved</pre>
+    <p>A motorised &#189;" ball valve at the bowl's low point does it &#8212; preferred over a solenoid because it has no coil heat, holds position on power loss, and is full-port so it doesn't become a crevice.</p>
+    <div class="note warn">
+      <h4>Conductivity is a weak proxy &#8212; say so in the control law</h4>
+      <p>Saliva and biofilm barely move TDS. So the conductivity trigger can only ever <em>add</em> dumps: fire an extra blowdown when <code>bowl_tds &gt; 1.5 &#215; makeup baseline</code>, but keep a <strong>hard 24 h forced dump</strong> underneath it. The floor is not optional. Being honest about the proxy's limits is what separates an instrument from a decoration.</p>
+    </div>
+    <h3>Design rules that make clean-in-place possible</h3>
+    <p>Get these wrong at build time and no procedure recovers them.</p>
+    <ul>
+      <li><strong>No dead legs.</strong> Every branch stub under 6 pipe diameters &#8212; under 3" on &#189;" line. Dead legs are where biofilm lives, because CIP flow never reaches them.</li>
+      <li><strong>Self-draining.</strong> Slope horizontals &#8805; &#8539;" per foot toward FV-202. No traps, no low point holding 50 mL of last month.</li>
+      <li><strong>Full-port ball valves only.</strong> Gate and globe valves both have unswept internal cavities.</li>
+      <li><strong>Scouring velocity during CIP.</strong> This is why P-101 is oversized:</li>
+    </ul>
+    <pre>&#189;" type L:  ID 13.8 mm,  A = 1.51 cm&#178;
+serving      2 L/min &#8594; v = 0.22 m/s    quiet, gentle, useless for cleaning
+<b>CIP mode    10 L/min &#8594; v = 1.10 m/s    Re = 15,000 &#8594; fully turbulent &#10003;</b></pre>
+    <p>Turbulent shear is what removes biofilm; a slow rinse does not. PWM the pump &#8212; 2 L/min in service so the dogs get a calm stream, 100% during CIP.</p>
+    <p>Also: no PVC or vinyl tubing anywhere (plasticiser migration, and the bore roughens and colonises). Hard-pipe everything, with one short platinum-cured silicone section purely for vibration isolation, replaced annually. Bowl in 316 SS, electropolished if you can get it &#8212; Ra under 0.8 &#181;m sheds biofilm an order of magnitude better than scratched ABS.</p>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;06</b>Cu<br>Materials</div>
+  <div>
+    <h2>Copper is defensible &#8212; but quantify the leaching</h2>
+    <p>Copper earns its place beyond looks: it's oligodynamic, and copper surfaces measurably suppress biofilm, which is the exact failure mode of every consumer fountain. It's also stiff, solderable, and cleanable. Use &#189;" type L for the pump discharge, riser, and spout. <strong>Never</strong> for the reservoir, or anywhere water sits still more than 8 hours.</p>
+    <p>Copper-associated hepatopathy is real and breed-linked &#8212; Bedlington Terriers via <em>COMMD1</em>, and more variably Labradors, Dobermans, Westies, Dalmatians. Diet dominates the exposure, but water is additive:</p>
+    <div class="kpis">
+      <div class="kpi"><dt>EPA action level</dt><dd>1.3 <small>mg/L</small></dd></div>
+      <div class="kpi"><dt>NRC allowance, 30 kg dog</dt><dd>2.6 <small>mg/day</small></dd></div>
+      <div class="kpi"><dt>From water @ 1 mg/L</dt><dd>1.5 <small>mg/day</small></dd></div>
+      <div class="kpi"><dt>Your target</dt><dd>&lt;0.3 <small>mg/L</small></dd></div>
+    </div>
+    <p>So water at the EPA limit could add ~60% on top of a 30 kg dog's dietary allowance. Well under any toxic threshold, but it's the wrong direction and worth engineering away. Six mitigations, in order of effect:</p>
+    <ul>
+      <li><strong>Never stagnate.</strong> Leaching is driven by contact time. Continuous recirculation means seconds in copper, not overnight &#8212; worth an order of magnitude on its own. If you duty-cycle the pump, flush the riser to drain on restart rather than serving first-draw water.</li>
+      <li><strong>Check whether your water is favourable &#8212; it varies enormously by utility.</strong> Pull your annual Consumer Confidence Report for pH, alkalinity, and the Langelier index if published. Alkaline, moderately hard water is scale-forming: it passivates copper rather than dissolving it. Soft, low-alkalinity or acidic supply (pH under 7, alkalinity under 60 mg/L as CaCO&#8323;) is aggressive to copper and should push you toward stainless. Great Lakes surface water, for instance, runs pH 7.8&#8211;8.0 with alkalinity around 110 mg/L and a positive LSI &#8212; about as friendly as it gets. Don't assume; look it up.</li>
+      <li><strong>Passivate on your time.</strong> 72 h of recirculation on tap water, dumped and refilled daily, before a dog ever drinks from it.</li>
+      <li><strong>No acid dwell.</strong> StarSan left in copper overnight is a leaching spike. Short-contact peracetic acid, then rinse.</li>
+      <li><strong>Lead-free everything.</strong> Sn/Ag or Sn/Cu solder, never 50/50 Sn-Pb. NSF/ANSI-61 no-lead brass (&#8804;0.25% Pb) for any valve body &#8212; ordinary yellow brass is around 2% lead. Cheapest way to skip the argument: solder joints and stainless valves, zero brass.</li>
+      <li><strong>Measure it.</strong> Bicinchoninate strips, ~$15 for 50. First-draw sample at 30 and 180 days. Target under 0.3 mg/L, act above 0.5. Log it.</li>
+    </ul>
+    <div class="note stop">
+      <h4>If you have a Bedlington, Lab, or Doberman</h4>
+      <p>Build the wetted path in 316L and use copper as non-wetted cladding, or use tin-lined line. You lose the antimicrobial benefit, you keep the look, and you delete the entire question.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;07</b>UC-100<br>Controls</div>
+  <div>
+    <h2>Instruments, and the light that needs no network</h2>
+    <p>You asked whether a blinking light would do instead of email. It would &#8212; so the stack light is tier zero of notification, driven straight off the ESP32 with nothing in the path. It works with the router unplugged. Everything else is additive.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Light</th><th>State</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="lamp g"><i></i>GREEN</span></td><td>steady</td><td>reservoir &gt; 30%, bowl wet, pump and UV drawing current</td></tr>
+        <tr><td><span class="lamp a blink"><i></i>AMBER</span></td><td>0.5 Hz</td><td>reservoir &lt; 30% &#8212; roughly 3 days left, refill when convenient</td></tr>
+        <tr><td><span class="lamp a blink fast"><i></i>AMBER</span></td><td>2 Hz</td><td>reservoir &lt; 10%, or UV lamp past 8,000 h, or filter &#916;P high</td></tr>
+        <tr><td><span class="lamp r blink fast"><i></i>RED</span></td><td>2 Hz</td><td><strong>bowl dry</strong>, leak detected, pump stalled, or fill timeout</td></tr>
+      </tbody>
+    </table></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Tag</th><th>Signal</th><th>Device</th><th>Why this one</th></tr></thead>
+      <tbody>
+        <tr><td class="num">WT-101</td><td>reservoir litres</td><td>4&#215; 50 kg load cell + HX711</td><td><strong>Nothing touches the water</strong>, so nothing fouls. Mass&#8594;volume is geometry-independent and immune to foam and condensation. 24-bit gives ~10 mL practical resolution &#8212; and it doubles as leak detection.</td></tr>
+        <tr><td class="num">LSL/LSH-201</td><td>bowl level</td><td>2&#215; optical prism switch</td><td>No current in the water. Bare DC conductivity electrodes work, and they electrolyse the water and plate probe metal into the bowl. Optical is $8.</td></tr>
+        <tr><td class="num">FT-201</td><td>makeup flow</td><td>Hall turbine</td><td>Cross-check against reservoir mass loss. Divergence means a leak.</td></tr>
+        <tr><td class="num">TT-301</td><td>water temp</td><td>DS18B20 in a dry thermowell</td><td>Biofilm risk above 25 &#176;C, and it density-corrects the mass&#8594;volume maths.</td></tr>
+        <tr><td class="num">AT-301</td><td>bowl TDS</td><td>AC-excited conductivity probe</td><td>Drives adaptive blowdown, within the limits noted in &#167;04.</td></tr>
+        <tr><td class="num">II-301/401</td><td>pump &amp; UV current</td><td>2&#215; INA219</td><td><strong>"Relay closed" is not "lamp emitting."</strong> Verify the actuator, not the command. Pump dry-run, clog, and impeller failure are all distinguishable in the current signature.</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Failing safe</h3>
+    <ul>
+      <li>Makeup solenoid is <strong>normally closed</strong> &#8212; losing power closes it. Blowdown is a <strong>motorised ball valve</strong> &#8212; losing power holds it, so the bowl can't silently drain.</li>
+      <li>Pump is interlocked to the low-level switch; no dry running, ever.</li>
+      <li><strong>Three independent flood barriers</strong>, at least one not made of software: a firmware fill timeout (90 s without high level &#8594; close, latch fault, go red), a mechanical float valve, and the overflow standpipe.</li>
+      <li>Leak rope latches everything closed and needs a manual reset. Deliberate, not an oversight.</li>
+      <li>Controller goes on the IoT VLAN / <code>iot</code>. It's an IoT device; treat it like one. Mains is UV ballast only, on its own GFCI, physically separated from the low-voltage side.</li>
+    </ul>
+    <h3>Alerting, and not sharing fate with it</h3>
+    <p>ESPHome serves <code>/metrics</code> directly; Prometheus scrapes it and Alertmanager sends the mail. But if the homelab box is down, Prometheus can't tell you the homelab box is down &#8212; and it also can't tell you the dogs have no water. So the two alerts that matter, <strong>bowl dry</strong> and <strong>leak</strong>, also fire from the device itself, and the red light needs no network at all. The ESP pushes a heartbeat to a dead-man's switch so a dead controller is itself an alert.</p>
+    <pre># fixed threshold: ~3 days of margin
+dogfountain_reservoir_liters &lt; 17
+
+# better &#8212; constant lead time regardless of how fast they're drinking
+<b>predict_linear(dogfountain_reservoir_liters[12h], 48*3600) &lt; 0</b>
+
+# the one that actually matters
+dogfountain_bowl_level_low == 0    for: 10m    severity: critical</pre>
+    <div class="note">
+      <h4>The reason to instrument rather than just enlarge</h4>
+      <p>Once reservoir mass is continuous and you subtract blowdown and modelled evaporation, you have daily household water intake. Sustained polydipsia is one of the earliest owner-detectable signs of chronic kidney disease, diabetes mellitus, and hyperadrenocorticism &#8212; often months ahead of anything else visible.</p>
+      <pre>  increase(dogfountain_drink_liters_total[7d])
+&gt; 1.5 * increase(dogfountain_drink_liters_total[7d] offset 7d)</pre>
+      <p>Route it at <code>severity: info</code>, never to anything that pages. It's a household aggregate, so it tells you <em>someone</em> changed, not who &#8212; and it's a prompt to book a vet appointment, not a diagnosis. Rule out heat, exercise, and a diet change first. But it is a real early-warning signal that a $40 plastic bowl cannot give you.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="tag"><b>&#167;08</b>Cost</div>
+  <div>
+    <h2>What it costs, honestly</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Group</th><th>Principal items</th><th class="n">Est.</th></tr></thead>
+      <tbody>
+        <tr><td>Vessels</td><td>15 gal Sanke keg or SS kettle; 316 SS bowl, electropolished</td><td class="n">$165</td></tr>
+        <tr><td>Rotating &amp; treatment</td><td>12 V mag-drive pump &#8805;10 L/min; Big Blue + washable pleated; UV-C + spare lamp</td><td class="n">$172</td></tr>
+        <tr><td>Piping</td><td>&#189;" type L copper, lead-free solder, SS ball valves, tri-clamp, strainer, gaskets</td><td class="n">$195</td></tr>
+        <tr><td>Valves</td><td>NC solenoid (NSF-61); motorised ball valve; 0 psi float valve</td><td class="n">$80</td></tr>
+        <tr><td>Instruments</td><td>load cells + HX711, optical switches, flow, DS18B20 + thermowell, TDS, 2&#215; INA219, leak rope</td><td class="n">$102</td></tr>
+        <tr><td>Controls</td><td>ESP32-S3, 12 V PSU, MOSFETs, relays, stack light, IP54 enclosure + DIN</td><td class="n">$135</td></tr>
+        <tr><td>Structure</td><td>80/20 or welded SS frame; sloped SS drip tray</td><td class="n">$165</td></tr>
+        <tr><td>Chemistry</td><td>PBW, peracetic acid, copper test strips, spare gaskets</td><td class="n">$45</td></tr>
+        <tr class="total"><td colspan="2">Tier 3, variant A</td><td class="n">&#8776; $1,059</td></tr>
+      </tbody>
+    </table></div>
+    <p>Realistically $850&#8211;1,150 depending on what's already in the garage, against a $40 Kastty. The honest framing: you aren't buying water delivery. You're buying <strong>zero monthly consumables, a two-week refill cadence, a bowl that is actually clean, and a health telemetry stream</strong> &#8212; and the first three of those are most of the way there at Tier 2 for $130.</p>
+    <h3>Build notes people learn the hard way</h3>
+    <ul>
+      <li><strong>P-101 must be flooded-suction.</strong> Mag-drive centrifugals don't self-prime. Mount it below the bowl water line or it'll sit there spinning air.</li>
+      <li><strong>Solder all copper before mounting anything.</strong> A torch near a load cell, a TDS probe, or a silicone gasket ruins the afternoon.</li>
+      <li><strong>Flush hard after soldering.</strong> Flux residue is acidic and is the leading cause of early copper leaching in new work &#8212; three hot fill-and-dump cycles before the 72 h passivation soak.</li>
+      <li><strong>Bowl stays at floor level.</strong> Evidence in large and giant breeds associates elevated feeders with <em>increased</em> GDV risk. Not worth the aesthetics.</li>
+      <li><strong>The splash is the noise, not the pump.</strong> Low weir, laminar spout, rubber-isolate P-101, break the structure-borne path at the silicone section.</li>
+      <li><strong>Dogs will chew it, lean on it, and stand in it.</strong> Everything under 24" survives 40 kg of enthusiasm: no exposed wiring, no glass sight tubes, cable in stainless flex.</li>
+      <li><strong>Load cells drift with temperature.</strong> Auto-tare in a known-zero-flow window &#8212; 03:00, pump off, valves closed &#8212; and density-correct from TT-301.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  Repo: DESIGN.md &#183; docs/TIER2.md &#183; docs/HOSE-TIMER.md &#183; docs/CIP.md &#183; esphome/dogfountain.yaml &#183; prometheus/ &#8212; rules validated with promtool (15 rules), alertmanager config with amtool. ESPHome config is YAML-valid but has not been compiled against hardware. Nothing here has been through a plumbing inspection.
+</footer>
+
+</div>

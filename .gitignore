@@ -1,0 +1,13 @@
+# secrets -- never commit
+secrets.yaml
+smtp_password
+*.key
+*.pem
+.env
+
+# esphome build output
+.esphome/
+esphome/.esphome/
+
+# os
+.DS_Store

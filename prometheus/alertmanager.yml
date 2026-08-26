@@ -1,0 +1,41 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@example.com'
+  smtp_auth_username: 'you@example.com'
+  smtp_auth_password_file: /etc/alertmanager/smtp_password   # app password, not the real one
+
+route:
+  receiver: email-default
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    # Dogs with no water, or water on the floor. Nag until acknowledged.
+    - matchers: [severity="critical"]
+      receiver: email-critical
+      repeat_interval: 30m
+    # Consumable / trend / health. Once a day is plenty.
+    - matchers: [severity="info"]
+      receiver: email-default
+      repeat_interval: 24h
+
+receivers:
+  - name: email-default
+    email_configs:
+      - to: 'you@example.com'
+        headers: {Subject: '[dogfountain] {{ .CommonAnnotations.summary }}'}
+  - name: email-critical
+    email_configs:
+      - to: 'you@example.com'
+        headers: {Subject: '[dogfountain][CRITICAL] {{ .CommonAnnotations.summary }}'}
+
+inhibit_rules:
+  # An empty reservoir already explains a dry bowl -- don't send both.
+  - source_matchers: [alertname="ReservoirCritical"]
+    target_matchers: [alertname="BowlDry"]
+    equal: [location]
+  # A dead exporter explains every derived alert.
+  - source_matchers: [alertname="FountainExporterDown"]
+    target_matchers: [severity=~"warning|info"]

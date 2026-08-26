@@ -1,0 +1,26 @@
+# Drop-in on the homelab box alongside the rest of the stack. Proxy via Caddy if you want a UI.
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fountain-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./dogfountain.rules.yml:/etc/prometheus/rules/dogfountain.rules.yml:ro
+      - prom-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2y      # keep the intake history; that's the health signal
+    ports: ["9090:9090"]
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: fountain-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./smtp_password:/etc/alertmanager/smtp_password:ro   # create this: echo -n <gmail-app-password> > smtp_password && chmod 600 smtp_password
+      - am-data:/alertmanager
+    ports: ["9093:9093"]
+
+volumes: {prom-data: {}, am-data: {}}

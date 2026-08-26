@@ -1,0 +1,135 @@
+groups:
+  - name: dogfountain
+    interval: 30s
+    rules:
+
+      # ---------------------------------------------------------------- derived
+      - record: dogfountain:reservoir_days_remaining
+        expr: |
+          dogfountain_reservoir_liters
+            / clamp_min(
+                (increase(dogfountain_drink_liters_total[24h])
+                 + increase(dogfountain_makeup_liters_total[24h])) / 1, 0.5)
+
+      # ---------------------------------------------------------------- refill
+      # Threshold alert. 17 L of 57 ~= 3 days for two 30 kg dogs.
+      - alert: ReservoirLow
+        expr: dogfountain_reservoir_liters < 17
+        for: 15m
+        labels: {severity: warning, route: email}
+        annotations:
+          summary: "Dog water reservoir low: {{ $value | printf \"%.1f\" }} L"
+          description: "~{{ with query \"dogfountain:reservoir_days_remaining\" }}{{ . | first | value | printf \"%.1f\" }}{{ end }} days left. Refill when convenient."
+
+      - alert: ReservoirCritical
+        expr: dogfountain_reservoir_liters < 6
+        for: 5m
+        labels: {severity: critical, route: email}
+        annotations:
+          summary: "Dog water reservoir CRITICAL: {{ $value | printf \"%.1f\" }} L"
+
+      # Better than a fixed threshold: constant *lead time* regardless of how fast
+      # they are drinking. 12h window keeps it from chasing a single long nap.
+      - alert: ReservoirEmptyWithin48h
+        expr: |
+          predict_linear(dogfountain_reservoir_liters[12h], 48 * 3600) < 0
+          and dogfountain_reservoir_liters < 30
+        for: 30m
+        labels: {severity: warning, route: email}
+        annotations:
+          summary: "Dog water reservoir projected empty within 48h"
+
+      # ---------------------------------------------------------------- safety
+      # The one that actually matters. Dogs with no water is the whole failure mode.
+      - alert: BowlDry
+        expr: dogfountain_bowl_level_low == 0
+        for: 10m
+        labels: {severity: critical, route: email}
+        annotations:
+          summary: "DOG BOWL IS DRY"
+          description: "Bowl low-level switch has been unasserted for 10m. Makeup valve fault, reservoir empty, or pump interlock stuck. Check physically."
+
+      - alert: LeakDetected
+        expr: dogfountain_leak_detected == 1
+        labels: {severity: critical, route: email}
+        annotations:
+          summary: "Water leak at dog fountain -- valves latched closed"
+
+      # Reservoir losing mass with no dispense = leak upstream of the flow sensor.
+      - alert: ReservoirMassLossWithoutDispense
+        expr: |
+          (- delta(dogfountain_reservoir_liters[1h])) > 1
+          and increase(dogfountain_makeup_liters_total[1h]) < 0.2
+        for: 30m
+        labels: {severity: critical, route: email}
+        annotations:
+          summary: "Reservoir losing water with no measured dispense -- suspect leak"
+
+      # ---------------------------------------------------------------- equipment
+      # Verify the actuator, not the command. "Relay closed" != "lamp emitting".
+      - alert: UVLampNotEmitting
+        expr: dogfountain_uv_lamp == 1 and dogfountain_uv_current_a < 0.05
+        for: 5m
+        labels: {severity: warning, route: email}
+        annotations:
+          summary: "UV commanded on but drawing no current -- lamp or ballast failed"
+
+      - alert: UVLampEndOfLife
+        expr: dogfountain_uv_lamp_hours > 8000
+        labels: {severity: info, route: email}
+        annotations:
+          summary: "UV lamp at {{ $value | printf \"%.0f\" }} h -- order a replacement (9000 h rated)"
+
+      - alert: PumpStalled
+        expr: dogfountain_pump_cmd > 0.1 and dogfountain_pump_current_a < 0.05
+        for: 2m
+        labels: {severity: critical, route: email}
+        annotations:
+          summary: "Recirc pump commanded but drawing no current"
+
+      - alert: WaterTooWarm
+        expr: dogfountain_water_temp_c > 25
+        for: 2h
+        labels: {severity: warning, route: email}
+        annotations:
+          summary: "Bowl water {{ $value | printf \"%.1f\" }} C -- biofilm growth risk, consider an extra CIP"
+
+      - alert: BlowdownNotRunning
+        expr: increase(dogfountain_blowdown_valve[36h]) == 0
+        labels: {severity: warning, route: email}
+        annotations:
+          summary: "No blowdown cycle in 36h -- bowl water is going stale"
+
+      # ---------------------------------------------------------------- meta
+      # Monitor the monitor. A silent exporter is indistinguishable from a happy one.
+      - alert: FountainExporterDown
+        expr: up{job="dogfountain"} == 0
+        for: 10m
+        labels: {severity: critical, route: email}
+        annotations:
+          summary: "dogfountain exporter unreachable -- telemetry blind"
+          description: "NOTE: this alert shares fate with the homelab box. The device-side stack light and direct-SMTP path are the out-of-band backstop."
+
+      # ---------------------------------------------------------------- health
+      # Polydipsia is an early sign of CKD / diabetes mellitus / hyperadrenocorticism.
+      # INFORMATIONAL. Household aggregate across all dogs -- tells you *someone*
+      # changed, not who. This is a prompt to book a vet visit, not a diagnosis.
+      - alert: WaterIntakeUpSharply
+        expr: |
+          increase(dogfountain_drink_liters_total[7d])
+            > 1.5 * increase(dogfountain_drink_liters_total[7d] offset 7d)
+        for: 12h
+        labels: {severity: info, route: email}
+        annotations:
+          summary: "Household water intake up >50% week-over-week"
+          description: "Sustained polydipsia is an early indicator of kidney disease, diabetes, or Cushing's. Rule out heat, exercise, and diet change first, then consider a vet visit."
+
+      - alert: WaterIntakeDownSharply
+        expr: |
+          increase(dogfountain_drink_liters_total[7d])
+            < 0.6 * increase(dogfountain_drink_liters_total[7d] offset 7d)
+        for: 12h
+        labels: {severity: info, route: email}
+        annotations:
+          summary: "Household water intake down >40% week-over-week"
+          description: "Check first that the fountain is actually working before worrying about the dogs."
